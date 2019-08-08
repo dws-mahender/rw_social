@@ -1,0 +1,18 @@
+# Byte-compiled / optimized / DLL files
+twitter/__pycache__/
+
+
+# Ignore config files (ini)
+*.ini
+
+# Dev related
+/twitter/testing/
+
+# logs
+/twitter/logs
+
+# pycharm related
+.idea/
+
+# Twitter API credentials
+twitter/credentials.json
