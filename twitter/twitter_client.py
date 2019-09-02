@@ -59,6 +59,25 @@ def get_twitter_client(r, key):
     api = authenticate_credential(credential)
     if not api:
         logger.error("Credential {} is failing authentication".format(cred_id))
-
+        return False
     return api, cred_id
+
+
+def load_credentials(r, key):
+    """
+
+    :param r:
+    :param key:
+    :return:
+    """
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), config.get('CREDENTIAL', 'FILE'))) as fp:
+        c = load(fp)
+    credentials = c['twitter'].keys()
+    [r.lpush(key, credential) for credential in credentials]
+    logger.info('Credentials loaded in redis')
+
+
+def clear_credentials(r, key):
+    r.delete(key)
+    print('cleared credentials')
 

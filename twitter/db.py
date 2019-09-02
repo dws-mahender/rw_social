@@ -1,6 +1,7 @@
 import configparser
 import logging
 import os
+import psycopg2
 from pymongo import MongoClient
 from redis import StrictRedis
 
@@ -40,5 +41,18 @@ def connect_mongo():
     except Exception as e:
         logger.error('Error in connecting to mongo : {}'.format(e))
 
+
+def connect_pg():
+    try:
+        connection = psycopg2.connect(user=config.get('POSTGRES', 'USER'),
+                                      password=config.get('POSTGRES', 'PWD'),
+                                      host=config.get('POSTGRES', 'HOST'),
+                                      port=config.get('POSTGRES', 'PORT'),
+                                      database=config.get('POSTGRES', 'DB'))
+
+        return connection
+    except psycopg2.DatabaseError as e:
+        print(e)
+        return e.pgerror
 
 
