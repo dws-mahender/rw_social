@@ -22,41 +22,22 @@ logger = logging.getLogger('social')
 logs.configure_logging()
 
 
-def make_keywords_queue(r, collection, r_key):
-    """
-
-    :param r:
-    :param collection:
-    :param r_key:
-    :return:
-    """
-    # get keywords
-    kwds_list = collection.find({"active": 1}, {"_id": 1, "kw": 1, "chkst": 1})
-
-    # make redis keywords queue
-    for kwd in kwds_list:
-        kwd_data = dumps({
-            'kwd': kwd['kw'],
-            'chkst': 1 if kwd['chkst'] else 0,
-            'since_id': kwd['since_id'] if 'since_id' in kwd else 0
-        })
-
-        r.lpush(r_key, kwd_data)
-    logger.info('Pushed all data to redis')
-
-
 def feed_saver_new_keyword_tweets(channel, tweets):
-    channel.queue_declare(queue='save_twitter_kwds', durable=True)
+    try:
+        channel.queue_declare(queue='save_twitter_kwds', durable=True)
 
-    # Quality of Service
-    channel.basic_qos(prefetch_count=1)
+        # Quality of Service
+        channel.basic_qos(prefetch_count=1)
 
-    channel.basic_publish(exchange='',
-                          routing_key='save_twitter_kwds',
-                          body=dumps(tweets, default=str),
-                          properties=pika.BasicProperties(
-                              delivery_mode=2,  # make message persistent
-                          ))
+        channel.basic_publish(exchange='',
+                              routing_key='save_twitter_kwds',
+                              body=dumps(tweets, default=str),
+                              properties=pika.BasicProperties(
+                                  delivery_mode=2,  # make message persistent
+                              ))
+    except Exception as e:
+        print('Saver feeder exception : ', e)
+        print('From feed_saver_new_keyword_tweet')
 
 
 def process_page(page, kw, pg_no):
@@ -84,23 +65,27 @@ def process_page(page, kw, pg_no):
         link = "https://www.twitter.com/{}/status/{}".format(user, tweet_id)
         title = "{} tweeted about {}".format(user, kw['kwd'])
         add_data = dumps({'tweet_id': tweet.id})
-        data = (kw['k_id'], 1, datetime.utcnow(), tweet.created_at, title, tweet.text, link, add_data, 'twitter.com')
+        # kw_id, src, added, time, title, text, link, add_data, author
+        data = (kw['k_id'], 1, tweet.created_at, datetime.utcnow(), title, tweet.text, link, add_data, user)
         tweets.append(data)
     result['k_id'] = kw['k_id']
     result['tweets'] = tweets
     return result, tweet_id
 
 
-def fetch_tweets(kwd, since_id, channel):
+def fetch_tweets(kwd, since_id, channel, redis_conf):
     """
 
     :param kwd:
     :param since_id:
     :param channel:
+    :param redis_conf:
     :return:
     """
     page_index = 0
-    api, credential_id = get_twitter_client(redis_cursor, r_cred)
+    r = redis_conf['cursor']
+    key = redis_conf['key']
+    api, credential_id = get_twitter_client(r, key)
     tweets_cursor = Cursor(api.search, q=kwd['kwd'], count=100, since_id=since_id).pages()
     retry = 0
     t_id = 0
@@ -123,16 +108,16 @@ def fetch_tweets(kwd, since_id, channel):
             logger.info('Tweets Finished..')
             print('Tweets Finished..')
             # Change credential & lpush current credential id
-            redis_cursor.lpush(r_cred, credential_id)
+            r.lpush(key, credential_id)
             return True
         except TweepError as error:
             if error.api_code == 429:
                 logger.error("Rate limit reached for credential with Id {} ".format(credential_id))
 
                 # Change credential & lpush current credential id
-                redis_cursor.lpush(r_cred, credential_id)
+                r.lpush(key, credential_id)
 
-                api, credential_id = get_twitter_client(redis_cursor, r_cred)
+                api, credential_id = get_twitter_client(r, key)
                 tweets_cursor = Cursor(api.search, q=kwd['kwd'], count=100, since_id=t_id).pages()
                 continue
 
@@ -141,24 +126,27 @@ def fetch_tweets(kwd, since_id, channel):
             logger.error('Exception occurred for keyword {}. Exception : {}'.format(kwd['kwd'], e))
             retry += 1
             # Change credential & lpush current credential id
-            redis_cursor.lpush(r_cred, credential_id)
+            r.lpush(key, credential_id)
             if retry <= 1:
                 print("Retrying...")
-                api, credential_id = get_twitter_client(redis_cursor, r_cred)
+                api, credential_id = get_twitter_client(r, key)
                 tweets_cursor = Cursor(api.search, q=kwd['kwd'], count=100, since_id=t_id).pages()
                 continue
             return False
 
 
-def fetch_tweets_new(kwd, channel):
+def fetch_tweets_new(kwd, channel, redis_conf):
     """
 
     :param kwd:
     :param channel:
+    :param redis_conf:
     :return:
     """
     page_index = 0
-    api, credential_id = get_twitter_client(redis_cursor, r_cred)
+    r = redis_conf['cursor']
+    key = redis_conf['key']
+    api, credential_id = get_twitter_client(r, key)
     if not api:
         logger.error("Credential {} is failing authentication".format(credential_id))
 
@@ -183,7 +171,7 @@ def fetch_tweets_new(kwd, channel):
                 feed_saver_new_keyword_tweets(channel, data)
             logger.info('Tweets Finished..')
             # Change credential & lpush current credential id
-            redis_cursor.lpush(r_cred, credential_id)
+            r.lpush(key, credential_id)
             return True
 
         except TweepError as error:
@@ -191,9 +179,9 @@ def fetch_tweets_new(kwd, channel):
                 logger.error("Rate limit reached for credential with Id {} ".format(credential_id))
 
                 # Change credential & lpush current credential id
-                redis_cursor.lpush(r_cred, credential_id)
+                r.lpush(key, credential_id)
 
-                api, credential_id = get_twitter_client(redis_cursor, r_cred)
+                api, credential_id = get_twitter_client(r, key)
                 tweets_cursor = Cursor(api.search, q=kwd['kwd'], count=100, since=since, max_id=t_id).pages()
                 continue
 
@@ -202,75 +190,11 @@ def fetch_tweets_new(kwd, channel):
             logger.error('Exception occurred for keyword {}. Exception : {}'.format(kwd['kwd'], e))
             retry += 1
             # Change credential & lpush current credential id
-            redis_cursor.lpush(r_cred, credential_id)
+            r.lpush(key, credential_id)
             if retry <= 1:
                 print("Retrying...")
-                api, credential_id = get_twitter_client(redis_cursor, r_cred)
+                api, credential_id = get_twitter_client(r, key)
                 tweets_cursor = Cursor(api.search, q=kwd['kwd'], count=100, since=since, max_id=t_id).pages()
                 continue
             return False
-
-
-def process_job(kwd_list):
-    """
-
-    :param kwd_list:
-    :return:
-    """
-    while True:
-        raw_keyword = redis_cursor.brpop(kwd_list, timeout=300)
-        if not raw_keyword:
-            logger.error('Redis Keyword list empty')
-            # ALERT
-        else:
-            keyword = loads(raw_keyword[1])
-            kwd = keyword['kwd']
-            if keyword['chkst'] == -1:  # new keyword
-                response = fetch_tweets_new(kwd)
-                if not response:
-                    # lpush keyword again and continue
-                    redis_cursor.lpush(kwd_list, raw_keyword)
-                    continue
-            else:
-                # already processed keyword
-                response = fetch_tweets(kwd, since_id=keyword['since_id'])
-                if not response:
-                    # lpush keyword again and continue
-                    redis_cursor.lpush(kwd_list, raw_keyword)
-                    continue
-
-
-def main():
-
-    # Get Keywords and push them into redis
-    db = connect_mongo()
-    social_keywords = db['dev_social_keywords']
-
-    # push all keywords in redis queue
-    make_keywords_queue(redis_cursor, social_keywords, r_kwds)
-
-    # Load Twitter API Authentication credential Ids
-    load_credentials(redis_cursor, r_cred)
-
-    # process keywords
-    process_job(kwd_list=r_kwds)
-
-
-if __name__ == "__main__":
-    # configure logging
-    logs.configure_logging()
-
-    # connect to redis and get a cursor
-    redis_cursor = connect_redis()
-
-    # SET REDIS KEYS
-    # this queue maintains all ips for which health report is to be judged
-    r_kwds = config.get('REDIS', 'TWITTER_KWDS')
-    # contains credentials list
-    r_cred = config.get('REDIS', 'CREDENTIALS_LIST')
-
-    main()
-
-
-
 

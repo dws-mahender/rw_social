@@ -6,17 +6,17 @@ from json import loads
 from fetch_tweets import fetch_tweets_new, fetch_tweets
 from db import connect_redis
 from twitter_client import load_credentials, clear_credentials
+import time
 
 
 def get_tweets(ch, method, properties, body):
     kwd = loads(body)
-    # print(kwd)
     print(" [x] %r received %r" % (multiprocessing.current_process(), kwd,))
 
     if 'old' in kwd:
-        response = fetch_tweets(kwd=kwd, since_id=kwd['since_id'], channel=ch)
+        response = fetch_tweets(kwd=kwd, since_id=kwd['since_id'], channel=ch, redis_conf=redis_config)
     else:
-        response = fetch_tweets_new(kwd=kwd, channel=ch)
+        response = fetch_tweets_new(kwd=kwd, channel=ch, redis_conf=redis_config)
     if not response:
         # push it to queue again
         print('False response from fetch tweets new')
@@ -25,8 +25,10 @@ def get_tweets(ch, method, properties, body):
 
 
 def consume():
-    connection = pika.BlockingConnection(pika.ConnectionParameters(
-                   'localhost'))
+    credentials = pika.PlainCredentials('guest', 'guest')
+    parameters = pika.ConnectionParameters('localhost', credentials=credentials, heartbeat=5)
+    connection = pika.BlockingConnection(parameters)
+
     channel = connection.channel()
     channel.basic_qos(prefetch_count=1)
 
@@ -57,7 +59,7 @@ if __name__ == '__main__':
 
     # Load Twitter API Authentication credential Ids
     load_credentials(redis_cursor, r_cred)
-
+    redis_config = {'cursor': redis_cursor, 'key': r_cred}
     workers = 1
     pool = multiprocessing.Pool(processes=workers)
     for i in range(0, workers):

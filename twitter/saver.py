@@ -3,13 +3,8 @@ import pika
 import multiprocessing
 from json import loads
 from datetime import datetime, timedelta
-
-
-# def bulk_insert(cursor, postgres, chunk):
-#     cursor.executemany(
-#         "INSERT into app_post(kw_id,src,added,time,title,text,link,add_data,author) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-#         chunk)
-#     postgres.commit()
+from psycopg2 import extras
+from time import time
 
 
 def bulk_insert(cursor, postgres, chunks):
@@ -19,7 +14,7 @@ def bulk_insert(cursor, postgres, chunks):
                             VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""", tuple(chunk))
         post_id = cursor.fetchone()[0]
         post_ids.append(post_id)
-        postgres.commit()
+    postgres.commit()
     return post_ids
 
 
@@ -27,7 +22,7 @@ def save_tweets():
     print(multiprocessing.current_process(), "Started ... ")
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
     channel = connection.channel()
-    channel.basic_qos(prefetch_count=4)
+    channel.basic_qos(prefetch_count=1)
     channel.queue_declare(queue='save_twitter_kwds', durable=True)
     #  postgres
     postgres = connect_pg()
@@ -59,16 +54,17 @@ def save_tweets():
                     print('All tweets finished for ', kwd['k_id'])
                     # for new keyword delay is set to 1 by default ,so frequency * delay will be 60 seconds
                     # scheduled_on = datetime.utcnow() + timedelta(seconds=60)
-                    scheduled_on = datetime.utcnow() + timedelta(seconds=total_delay)
+                    scheduled_on = int(time()) + 60  # config
                     social_keywords.update_one({"src_id": 1,
                                                 "k_id": kwd['k_id']},
-                                               {"$set": {"scheduled_on": scheduled_on}}
+                                               {"$set": {"scheduled_on": scheduled_on, "queued": 0}}
                                                )
                 elif kwd['status'] == 404:  # No Tweets found for the keyword
-                    scheduled_on = datetime.utcnow() + timedelta(seconds=120)
+                    print('No tweets found')
+                    scheduled_on = int(time()) + total_delay
                     social_keywords.update_one({"src_id": 1,
                                                 "k_id": kwd['k_id']},
-                                               {"$set": {"scheduled_on": scheduled_on}, "$mul": {"delay": 2}}
+                                               {"$set": {"scheduled_on": scheduled_on, "queued": 0}, "$mul": {"delay": 2}}
                                                )
                 if post_ids:
                     data = list()
@@ -76,9 +72,10 @@ def save_tweets():
                         for post in post_ids:
                             data.append((user['user_id'], kwd['k_id'], user['p_id'], post, datetime.utcnow(), '', 1,
                                          datetime.utcnow(), 1, 1, 1))
-                    cur.executemany("""Insert into app_userposts (user_id,kw_id,project_id,post_id,added,author,src,time,read,fav,status)
-                                                        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) """, data)
-                    postgres.commit()
+
+                    query = """Insert into app_userposts (user_id,kw_id,project_id,post_id,added,author,src,time,read,fav,status)
+                                                        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s); """
+                    extras.execute_batch(cur, query, data)
 
                 # Acknowledge the message
                 channel.basic_ack(method_frame.delivery_tag)
