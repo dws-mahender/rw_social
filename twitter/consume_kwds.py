@@ -26,7 +26,8 @@ def get_tweets(ch, method, properties, body):
 
 def consume():
     credentials = pika.PlainCredentials('guest', 'guest')
-    parameters = pika.ConnectionParameters('localhost', credentials=credentials, heartbeat=5)
+    parameters = pika.ConnectionParameters('localhost', credentials=credentials,
+                                           heartbeat=600, blocked_connection_timeout=300)
     connection = pika.BlockingConnection(parameters)
 
     channel = connection.channel()
@@ -60,7 +61,7 @@ if __name__ == '__main__':
     # Load Twitter API Authentication credential Ids
     load_credentials(redis_cursor, r_cred)
     redis_config = {'cursor': redis_cursor, 'key': r_cred}
-    workers = 1
+    workers = 2
     pool = multiprocessing.Pool(processes=workers)
     for i in range(0, workers):
         pool.apply_async(consume)  # also has callback option

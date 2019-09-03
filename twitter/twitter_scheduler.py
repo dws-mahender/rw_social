@@ -37,9 +37,9 @@ def schedule_kwds():
             queued_kwds.append(kwd['k_id'])
         else:
             print("New kwd discarded from here ", kwd["kw"])
-
-    n = social_keywords.update_many({"src_id": 1, "k_id": {"$in": queued_kwds}}, {"$set": {"queued": 1}})
-    print("Total queued kwds ", n.modified_count)
+    if queued_kwds:
+        n = social_keywords.update_many({"src_id": 1, "k_id": {"$in": queued_kwds}}, {"$set": {"queued": 1}})
+        print("Total queued kwds ", n.modified_count)
     print(" [x] Sent !")
     connection.close()
     time.sleep(120)

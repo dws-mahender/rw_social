@@ -42,6 +42,7 @@ def save_tweets():
                 post_ids = list()
 
                 if kwd['status'] == 200:  # Tweets for first page
+                    print('Since Id updated for ', kwd['k_id'])
                     # Update since id
                     social_keywords.update_one({"src_id": 1,
                                                 "k_id": kwd['k_id']},

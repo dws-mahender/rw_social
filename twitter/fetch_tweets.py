@@ -86,7 +86,8 @@ def fetch_tweets(kwd, since_id, channel, redis_conf):
     r = redis_conf['cursor']
     key = redis_conf['key']
     api, credential_id = get_twitter_client(r, key)
-    tweets_cursor = Cursor(api.search, q=kwd['kwd'], count=100, since_id=since_id).pages()
+    keyword = kwd['kwd'] + ' -filter:retweets'  # config
+    tweets_cursor = Cursor(api.search, q=keyword, count=100, since_id=since_id).pages()
     retry = 0
     t_id = 0
 
@@ -106,7 +107,7 @@ def fetch_tweets(kwd, since_id, channel, redis_conf):
                 data = {'status': 202, 'k_id': kwd['k_id']}
                 feed_saver_new_keyword_tweets(channel, data)
             logger.info('Tweets Finished..')
-            print('Tweets Finished..')
+            print('Tweets Finished..', kwd['kwd'])
             # Change credential & lpush current credential id
             r.lpush(key, credential_id)
             return True
@@ -118,7 +119,7 @@ def fetch_tweets(kwd, since_id, channel, redis_conf):
                 r.lpush(key, credential_id)
 
                 api, credential_id = get_twitter_client(r, key)
-                tweets_cursor = Cursor(api.search, q=kwd['kwd'], count=100, since_id=t_id).pages()
+                tweets_cursor = Cursor(api.search, q=keyword, count=100, since_id=t_id).pages()
                 continue
 
         except Exception as e:
@@ -130,7 +131,7 @@ def fetch_tweets(kwd, since_id, channel, redis_conf):
             if retry <= 1:
                 print("Retrying...")
                 api, credential_id = get_twitter_client(r, key)
-                tweets_cursor = Cursor(api.search, q=kwd['kwd'], count=100, since_id=t_id).pages()
+                tweets_cursor = Cursor(api.search, q=keyword, count=100, since_id=t_id).pages()
                 continue
             return False
 
@@ -151,7 +152,8 @@ def fetch_tweets_new(kwd, channel, redis_conf):
         logger.error("Credential {} is failing authentication".format(credential_id))
 
     since = datetime.strftime(datetime.now() - timedelta(1), '%Y-%m-%d')  # 24 hr
-    tweets_cursor = Cursor(api.search, q=kwd['kwd'], count=100, since=since).pages()
+    keyword = kwd['kwd'] + ' -filter:retweets'  # config
+    tweets_cursor = Cursor(api.search, q=keyword, count=100, since=since).pages()
     retry = 0
     t_id = 0
     while True:
@@ -182,7 +184,7 @@ def fetch_tweets_new(kwd, channel, redis_conf):
                 r.lpush(key, credential_id)
 
                 api, credential_id = get_twitter_client(r, key)
-                tweets_cursor = Cursor(api.search, q=kwd['kwd'], count=100, since=since, max_id=t_id).pages()
+                tweets_cursor = Cursor(api.search, q=keyword, count=100, since=since, max_id=t_id).pages()
                 continue
 
         except Exception as e:
@@ -194,7 +196,7 @@ def fetch_tweets_new(kwd, channel, redis_conf):
             if retry <= 1:
                 print("Retrying...")
                 api, credential_id = get_twitter_client(r, key)
-                tweets_cursor = Cursor(api.search, q=kwd['kwd'], count=100, since=since, max_id=t_id).pages()
+                tweets_cursor = Cursor(api.search, q=keyword, count=100, since=since, max_id=t_id).pages()
                 continue
             return False
 
