@@ -8,13 +8,26 @@ from time import time
 
 
 def bulk_insert(cursor, postgres, chunks):
-    post_ids = list()
-    for chunk in chunks:
-        cursor.execute("""Insert into app_post (kw_id,src,added,time,title,text,link,add_data,author)
-                            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""", tuple(chunk))
-        post_id = cursor.fetchone()[0]
-        post_ids.append(post_id)
+    data = [{
+            'kw_id': chunk[0],
+            'src': chunk[1],
+            'added': chunk[2],
+            'time': chunk[3],
+            'title': chunk[4],
+            'text': chunk[5],
+            'link': chunk[6],
+            'add_data': chunk[7],
+            'author': chunk[8]
+            } for chunk in chunks]
+    query = cursor.mogrify("INSERT INTO {} ({}) VALUES {} RETURNING {}".format(
+        'app_post',
+        ', '.join(data[0].keys()),
+        ', '.join(['%s'] * len(data)),
+        'id, added, author'
+    ), [tuple(v.values()) for v in data])
+    cursor.execute(query)
     postgres.commit()
+    post_ids = cursor.fetchall()
     return post_ids
 
 
@@ -22,7 +35,7 @@ def save_tweets():
     print(multiprocessing.current_process(), "Started ... ")
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
     channel = connection.channel()
-    channel.basic_qos(prefetch_count=1)
+    channel.basic_qos(prefetch_count=10)
     channel.queue_declare(queue='save_twitter_kwds', durable=True)
     #  postgres
     postgres = connect_pg()
@@ -71,8 +84,8 @@ def save_tweets():
                     data = list()
                     for user in users_list:
                         for post in post_ids:
-                            data.append((user['user_id'], kwd['k_id'], user['p_id'], post, datetime.utcnow(), '', 1,
-                                         datetime.utcnow(), 1, 1, 1))
+                            data.append((user['user_id'], kwd['k_id'], user['p_id'], post[0], post[1], post[2], 1,
+                                         datetime.utcnow(), 0, 0, 1))
 
                     query = """Insert into app_userposts (user_id,kw_id,project_id,post_id,added,author,src,time,read,fav,status)
                                                         VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s); """

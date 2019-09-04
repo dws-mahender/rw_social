@@ -24,7 +24,7 @@ def connect_redis():
 
     except Exception as e:
         logger.error('Error in connecting to redis : {}'.format(e))
-
+        return False
 
 def connect_mongo():
     """
