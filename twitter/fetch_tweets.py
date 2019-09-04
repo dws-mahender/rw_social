@@ -96,7 +96,7 @@ def fetch_tweets(kwd, since_id, channel, redis_conf):
             tweets, t_id = process_page(tweets_cursor.next(), kwd, page_index)
             feed_saver_new_keyword_tweets(channel, tweets)
             page_index += 1
-            sleep(2)
+            sleep(1)
         except StopIteration:
             if page_index == 0:
                 # No Tweets Found

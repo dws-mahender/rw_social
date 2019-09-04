@@ -77,7 +77,7 @@ def save_tweets():
                     query = """Insert into app_userposts (user_id,kw_id,project_id,post_id,added,author,src,time,read,fav,status)
                                                         VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s); """
                     extras.execute_batch(cur, query, data)
-
+                    postgres.commit()
                 # Acknowledge the message
                 channel.basic_ack(method_frame.delivery_tag)
 

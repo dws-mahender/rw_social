@@ -40,7 +40,9 @@ def schedule_kwds():
     if queued_kwds:
         n = social_keywords.update_many({"src_id": 1, "k_id": {"$in": queued_kwds}}, {"$set": {"queued": 1}})
         print("Total queued kwds ", n.modified_count)
-    print(" [x] Sent !")
+        print(" [x] Sent !")
+    else:
+        print("No queued keywords")
     connection.close()
     time.sleep(120)
 
