@@ -93,6 +93,7 @@ def fetch_tweets(kwd, since_id, channel, redis_conf):
 
     while True:
         try:
+            print(kwd, page_index)
             tweets, t_id = process_page(tweets_cursor.next(), kwd, page_index)
             feed_saver_new_keyword_tweets(channel, tweets)
             page_index += 1

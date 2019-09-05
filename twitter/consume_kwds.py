@@ -13,7 +13,7 @@ def get_tweets(ch, method, properties, body):
     kwd = loads(body)
     print(" [x] %r received %r" % (multiprocessing.current_process(), kwd,))
 
-    if 'old' in kwd:
+    if 'since_id' in kwd:
         response = fetch_tweets(kwd=kwd, since_id=kwd['since_id'], channel=ch, redis_conf=redis_config)
     else:
         response = fetch_tweets_new(kwd=kwd, channel=ch, redis_conf=redis_config)

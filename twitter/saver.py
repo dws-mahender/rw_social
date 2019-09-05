@@ -59,7 +59,7 @@ def save_tweets():
                     # Update since id
                     social_keywords.update_one({"src_id": 1,
                                                 "k_id": kwd['k_id']},
-                                               {"$set": {"since_id": kwd['since_id']}})
+                                               {"$set": {"since_id": kwd['since_id'], "new": 4}})
                     # Update tweets
                     post_ids = bulk_insert(cur, postgres, kwd['tweets'])
                 elif kwd['status'] == 201:  # Tweets after first page
@@ -71,14 +71,14 @@ def save_tweets():
                     scheduled_on = int(time()) + 60  # config
                     social_keywords.update_one({"src_id": 1,
                                                 "k_id": kwd['k_id']},
-                                               {"$set": {"scheduled_on": scheduled_on, "queued": 0}}
+                                               {"$set": {"scheduled_on": scheduled_on, "queued": 0, "new": 4}}
                                                )
                 elif kwd['status'] == 404:  # No Tweets found for the keyword
                     print('No tweets found')
                     scheduled_on = int(time()) + total_delay
                     social_keywords.update_one({"src_id": 1,
                                                 "k_id": kwd['k_id']},
-                                               {"$set": {"scheduled_on": scheduled_on, "queued": 0},
+                                               {"$set": {"scheduled_on": scheduled_on, "queued": 0, "new": 4},
                                                 "$inc": {"frequency": 1}}
                                                )
                 if post_ids:
