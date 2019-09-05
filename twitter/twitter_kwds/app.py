@@ -13,7 +13,7 @@ def feed_kwds(kwd_list):
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
     channel = connection.channel()
 
-    channel.queue_declare(queue='twitter_kwds', durable=True)
+    channel.queue_declare(queue='new_twitter_kwds', durable=True)
 
     # Quality of Service
     channel.basic_qos(prefetch_count=1)
@@ -23,7 +23,7 @@ def feed_kwds(kwd_list):
             'k_id': kwd['k_id']
         })
         channel.basic_publish(exchange='',
-                              routing_key='twitter_kwds',
+                              routing_key='new_twitter_kwds',
                               body=kwd_data,
                               properties=pika.BasicProperties(
                                   delivery_mode=2,  # make message persistent

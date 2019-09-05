@@ -15,13 +15,15 @@ def schedule_kwds():
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
     channel = connection.channel()
 
-    channel.queue_declare(queue='twitter_kwds', durable=True)
-
-    # Quality of Service
-    channel.basic_qos(prefetch_count=1)
     queued_kwds = list()
     for kwd in kwds:
         if 'since_id' in kwd:
+
+            channel.queue_declare(queue='twitter_kwds', durable=True)
+
+            # Quality of Service
+            channel.basic_qos(prefetch_count=1)
+
             kwd_data = dumps({
                 'kwd': kwd['kw'],
                 'k_id': kwd['k_id'],
@@ -36,7 +38,25 @@ def schedule_kwds():
                                   ))
             queued_kwds.append(kwd['k_id'])
         else:
-            print("New kwd discarded from here ", kwd["kw"])
+            print("New kwd scheduled for 24 hr calculation :", kwd["kw"])
+
+            channel.queue_declare(queue='new_twitter_kwds', durable=True)
+
+            # Quality of Service
+            channel.basic_qos(prefetch_count=1)
+
+            kwd_data = dumps({
+                'kwd': kwd['kw'],
+                'k_id': kwd['k_id']
+            })
+            channel.basic_publish(exchange='',
+                                  routing_key='new_twitter_kwds',
+                                  body=kwd_data,
+                                  properties=pika.BasicProperties(
+                                      delivery_mode=2,  # make message persistent
+                                  ))
+            queued_kwds.append(kwd['k_id'])
+
     if queued_kwds:
         n = social_keywords.update_many({"src_id": 1, "k_id": {"$in": queued_kwds}}, {"$set": {"queued": 1}})
         print("Total queued kwds ", n.modified_count)

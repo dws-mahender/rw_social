@@ -26,6 +26,7 @@ def connect_redis():
         logger.error('Error in connecting to redis : {}'.format(e))
         return False
 
+
 def connect_mongo():
     """
     Creates a mongo connection

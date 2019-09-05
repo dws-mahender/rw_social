@@ -2,7 +2,7 @@ from db import connect_pg, connect_mongo
 import pika
 import multiprocessing
 from json import loads
-from datetime import datetime, timedelta
+from datetime import datetime
 from psycopg2 import extras
 from time import time
 
@@ -35,7 +35,7 @@ def save_tweets():
     print(multiprocessing.current_process(), "Started ... ")
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
     channel = connection.channel()
-    channel.basic_qos(prefetch_count=10)
+    channel.basic_qos(prefetch_count=2)
     channel.queue_declare(queue='save_twitter_kwds', durable=True)
     #  postgres
     postgres = connect_pg()
@@ -48,7 +48,7 @@ def save_tweets():
         while True:
             for method_frame, properties, body in channel.consume('save_twitter_kwds'):
                 kwd = loads(body)
-                print(multiprocessing.current_process(), " is working for ", kwd['k_id'])
+                # print(multiprocessing.current_process(), " is working for ", kwd['k_id'])
                 users = social_keywords.find({"src_id": 1, "k_id": kwd['k_id']}, {"users": 1, "delay": 1, "frequency": 1})
                 users_list = users[0]['users']
                 total_delay = users[0]['delay'] * users[0]['frequency']
@@ -78,7 +78,8 @@ def save_tweets():
                     scheduled_on = int(time()) + total_delay
                     social_keywords.update_one({"src_id": 1,
                                                 "k_id": kwd['k_id']},
-                                               {"$set": {"scheduled_on": scheduled_on, "queued": 0}, "$mul": {"delay": 2}}
+                                               {"$set": {"scheduled_on": scheduled_on, "queued": 0},
+                                                "$inc": {"frequency": 1}}
                                                )
                 if post_ids:
                     data = list()

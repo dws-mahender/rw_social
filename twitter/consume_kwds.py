@@ -24,7 +24,7 @@ def get_tweets(ch, method, properties, body):
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
-def consume():
+def consume_scheduled_kwds():
     credentials = pika.PlainCredentials('guest', 'guest')
     parameters = pika.ConnectionParameters('localhost', credentials=credentials,
                                            heartbeat=600, blocked_connection_timeout=300)
@@ -46,6 +46,28 @@ def consume():
         # channel.stop_consuming()
 
 
+def consume_new_kwds():
+    credentials = pika.PlainCredentials('guest', 'guest')
+    parameters = pika.ConnectionParameters('localhost', credentials=credentials,
+                                           heartbeat=600, blocked_connection_timeout=300)
+    connection = pika.BlockingConnection(parameters)
+
+    channel = connection.channel()
+    channel.basic_qos(prefetch_count=1)
+
+    channel.queue_declare(queue='new_twitter_kwds', durable=True)
+
+    channel.basic_consume(queue='new_twitter_kwds', on_message_callback=get_tweets)
+
+    print(' [*] Waiting for messages. To exit press CTRL+C')
+    try:
+        channel.start_consuming()
+    except KeyboardInterrupt:
+        connection.close()
+        channel.close()
+        # channel.stop_consuming()
+
+
 if __name__ == '__main__':
     config = configparser.ConfigParser()
     config.read(os.path.dirname(os.path.abspath(__file__)) + "/../config.ini")
@@ -53,7 +75,6 @@ if __name__ == '__main__':
     redis_cursor = connect_redis()
 
     # SET REDIS KEYS
-    # this queue maintains all ips for which health report is to be judged
     r_kwds = config.get('REDIS', 'TWITTER_KWDS')
     # contains credentials list
     r_cred = config.get('REDIS', 'CREDENTIALS_LIST')
@@ -61,11 +82,11 @@ if __name__ == '__main__':
     # Load Twitter API Authentication credential Ids
     load_credentials(redis_cursor, r_cred)
     redis_config = {'cursor': redis_cursor, 'key': r_cred}
-    workers = 2
+    workers = 3
     pool = multiprocessing.Pool(processes=workers)
-    for i in range(0, workers):
-        pool.apply_async(consume)  # also has callback option
-
+    for i in range(0, workers-1):
+        pool.apply_async(consume_new_kwds)  # also has callback option
+    pool.apply_async(consume_scheduled_kwds)
     # Stay alive
     try:
         while True:
