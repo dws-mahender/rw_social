@@ -8,10 +8,13 @@ import time
 def schedule_kwds():
     db = connect_mongo()
     social_keywords = db['request_log']
-    current_time = time.time()
-    scheduled_kwds = social_keywords.find({"src_id": 1, "queued": 0, "scheduled_on": {"$lte": current_time}, "new": 4},
-                                {"scheduled_on": 1, "kw": 1, "k_id": 1, "since_id": 1, "queued": 1})
-    new_kwds = social_keywords.find({"src_id": 1, "new": 1, "queued": {"$exists": False}}, {"kw": 1, "k_id": 1})
+    current_time = int(time.time())
+    # print(current_time)
+    scheduled_kwds = social_keywords.find({"src_id": 1, "new": 5, "status": 1,
+                                           "scheduled_on": {"$lte": current_time}, "queued": 0},
+                                          {"scheduled_on": 1, "kw": 1, "k_id": 1, "since_id": 1, "queued": 1})
+    #  "queued": {"$exists": False}} so that new kwds can not be duplicated
+    new_kwds = social_keywords.find({"src_id": 1, "new": 1, "status": 1, "queued": {"$exists": False}}, {"kw": 1, "k_id": 1})
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 
     # scheduled kwds

@@ -27,10 +27,9 @@ def authenticate_credential(c):
 
     try:
         api.verify_credentials()
-        logger.info("Authentication successful ")
     except TweepError as e:
-        if e.api_code == 32:
-            logger.error("Authentication error : {}".format(e))
+        # if e.api_code == 32:
+        logger.error("Authentication error : {}".format(e))
         # send alert
         return False
 
@@ -53,7 +52,6 @@ def get_twitter_client(r, key):
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), config.get('CREDENTIAL', 'FILE'))) as fp:
         c = load(fp)
     credential = c['twitter'][cred_id]
-    logger.info('Credential ID : {}'.format(cred_id))
 
     # Authenticate Credential
     api = authenticate_credential(credential)
