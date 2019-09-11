@@ -57,7 +57,11 @@ def get_twitter_client(r, key):
     api = authenticate_credential(credential)
     if not api:
         logger.error("Credential {} is failing authentication".format(cred_id))
-        return False
+        # Change credential & lpush current credential id
+        r.lpush(key, cred_id)
+        logger.info("Retrying with new credential ...")
+        get_twitter_client(r, key)
+        # return False
     return api, cred_id
 
 
