@@ -115,7 +115,7 @@ def save_tweets():
 
 if __name__ == '__main__':
 
-    workers = 4
+    workers = 2
     pool = multiprocessing.Pool(processes=workers)
     for i in range(0, workers):
         pool.apply_async(save_tweets)  # also has callback option

@@ -29,12 +29,12 @@ def authenticate_credential(c):
         api.verify_credentials()
     except TweepError as e:
         # if e.api_code == 32:
-        logger.error("Authentication error : {}".format(e))
+        logger.error(f"Authentication error : {e}")
         # send alert
         return False
 
     except Exception as e:
-        logger.error("Error during authentication of credential . Error : ", e)
+        logger.error(f"Error during authentication of credential . Error : {e}")
         # send alert
         return False
 
@@ -49,6 +49,7 @@ def get_twitter_client(r, key):
     :return: tuple (tweepy.API object, credential Id for which API object is returned)
     """
     cred_id = r.rpop(key)
+    logger.info(f"using credential : {cred_id}")
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), config.get('CREDENTIAL', 'FILE'))) as fp:
         c = load(fp)
     credential = c['twitter'][cred_id]
@@ -56,11 +57,10 @@ def get_twitter_client(r, key):
     # Authenticate Credential
     api = authenticate_credential(credential)
     if not api:
-        logger.error("Credential {} is failing authentication".format(cred_id))
+        logger.error(f"Credential {cred_id} is failing authentication")
         # Change credential & lpush current credential id
         r.lpush(key, cred_id)
-        logger.info("Retrying with new credential ...")
-        get_twitter_client(r, key)
+        return False, cred_id
         # return False
     return api, cred_id
 

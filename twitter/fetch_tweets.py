@@ -35,7 +35,7 @@ def feed_saver_new_keyword_tweets(channel, tweets):
                                   delivery_mode=2,  # make message persistent
                               ))
     except Exception as e:
-        logger.error("Saver feeder exception : : {}".format(e))
+        logger.error(f"Saver feeder exception : : {e}")
         print('Saver feeder exception : ', e)
         print('From feed_saver_new_keyword_tweet')
 
@@ -86,7 +86,12 @@ def fetch_tweets(kwd, since_id, channel, redis_conf):
     r = redis_conf['cursor']
     key = redis_conf['key']
     api, credential_id = get_twitter_client(r, key)
-    keyword = kwd['kwd'] + ' -filter:retweets'  # config
+    if not api:
+        logger.info(f"{credential_id} failed ...using another one ...")
+        api, credential_id = get_twitter_client(r, key)
+    logger.info(f"Fetch Tweets using credential id : {credential_id}")
+    keyword = kwd['kwd']
+    keyword = f'"{keyword} -filter:retweets"'  # kwd['kwd'] + "-filter:retweets"  # config
     tweets_cursor = Cursor(api.search, q=keyword, count=100, since_id=since_id, tweet_mode='extended').pages()
     retry = 0
     t_id = 0
@@ -119,21 +124,21 @@ def fetch_tweets(kwd, since_id, channel, redis_conf):
             r.lpush(key, credential_id)
 
             if error.api_code == 429:
-                logger.error("Rate limit reached for credential with Id {} ".format(credential_id))
+                logger.error(f"Rate limit reached for credential with Id {credential_id} ")
                 # api, credential_id = get_twitter_client(r, key)
                 # tweets_cursor = Cursor(api.search, q=keyword, count=100, since_id=t_id).pages()
                 # Instead send this & return False:
                 #  send data = {'status': 404, 'k_id': kwd['k_id']} or status 202 on basis of page_index
                 #  feed_saver_new_keyword_tweets(channel, data)
             else:
-                logger.error("Tweepy Exception occurred for credential id {} : {}".format(credential_id, error))
+                logger.error(f"Tweepy Exception occurred for credential id {credential_id} : {error}")
             data = {'status': 500, 'k_id': kwd['k_id']}
             feed_saver_new_keyword_tweets(channel, data)
             return False
 
         except Exception as e:
             # push keyword in queue & maintain log
-            logger.error('Exception occurred for keyword {}. Exception : {}'.format(kwd['kwd'], e))
+            logger.error(f"Exception occurred for keyword {kwd['kwd']}. Exception : {e}")
             retry += 1
             # Change credential & lpush current credential id
             r.lpush(key, credential_id)
@@ -141,7 +146,7 @@ def fetch_tweets(kwd, since_id, channel, redis_conf):
                 logger.info("Retrying .. ")
                 print("Retrying...")
                 api, credential_id = get_twitter_client(r, key)
-                tweets_cursor = Cursor(api.search, q=keyword, count=100, since_id=t_id, tweet_mode='extended').pages()
+                tweets_cursor = Cursor(api.search, q=keyword, count=100, since_id=since_id, max_id=t_id, tweet_mode='extended').pages()
                 continue
             data = {'status': 500, 'k_id': kwd['k_id']}
             feed_saver_new_keyword_tweets(channel, data)
@@ -161,10 +166,13 @@ def fetch_tweets_new(kwd, channel, redis_conf):
     key = redis_conf['key']
     api, credential_id = get_twitter_client(r, key)
     if not api:
-        logger.error("Credential {} is failing authentication".format(credential_id))
+        logger.info(f"{credential_id} failed ...using another one ...")
+        api, credential_id = get_twitter_client(r, key)
+    logger.info(f"Fetch Tweets New using credential id : {credential_id}")
 
     since = datetime.strftime(datetime.now() - timedelta(1), '%Y-%m-%d')  # 24 hr
-    keyword = kwd['kwd'] + ' -filter:retweets'  # config
+    keyword = kwd['kwd']
+    keyword = f'"{keyword} -filter:retweets"'  # kwd['kwd'] + "-filter:retweets"  # config
     tweets_cursor = Cursor(api.search, q=keyword, count=100, since=since, tweet_mode='extended').pages()
     retry = 0
     t_id = 0
@@ -193,18 +201,18 @@ def fetch_tweets_new(kwd, channel, redis_conf):
             r.lpush(key, credential_id)
 
             if error.api_code == 429:
-                logger.error("Rate limit reached for credential with Id {} ".format(credential_id))
+                logger.error(f"Rate limit reached for credential with Id {credential_id} ")
                 # api, credential_id = get_twitter_client(r, key)
                 # tweets_cursor = Cursor(api.search, q=keyword, count=100, since=since, max_id=t_id).pages()
             else:
-                logger.error("Tweepy Exception occurred {} for credential id {} :".format(credential_id, error))
+                logger.error(f"Tweepy Exception occurred for credential id {credential_id} : {error}")
             data = {'status': 500, 'k_id': kwd['k_id']}
             feed_saver_new_keyword_tweets(channel, data)
             return False
 
         except Exception as e:
             # push keyword in queue & maintain log
-            logger.error('Exception occurred for keyword {}. Exception : {}'.format(kwd['kwd'], e))
+            logger.error(f"Exception occurred for keyword {kwd['kwd']}. Exception : {e}")
             retry += 1
             # Change credential & lpush current credential id
             r.lpush(key, credential_id)
