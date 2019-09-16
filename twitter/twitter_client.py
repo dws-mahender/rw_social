@@ -23,7 +23,7 @@ def authenticate_credential(c):
 
     # Create the api to connect to twitter with your credentials
     # api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True, compression=True)
-    api = API(auth, compression=True)
+    api = API(auth, compression=True, retry_count=5, retry_delay=5)
 
     try:
         api.verify_credentials()
