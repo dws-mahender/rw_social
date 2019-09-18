@@ -1,8 +1,17 @@
-from datetime import datetime
+import configparser
 from db import connect_mongo
 from json import dumps
+import logging
+import logs
+import os
 import pika
 import time
+
+# create logger
+logger = logging.getLogger('social')
+
+# configure logging
+logs.configure_logging()
 
 
 def schedule_kwds():
@@ -19,15 +28,15 @@ def schedule_kwds():
 
     # scheduled kwds
     channel_scheduled_kwds = connection.channel()
-    channel_scheduled_kwds.queue_declare(queue='twitter_kwds', durable=True)
+    channel_scheduled_kwds.queue_declare(queue=config.get('CONSUMER', 'SCHEDULED_Q'), durable=True)
     # Quality of Service
-    channel_scheduled_kwds.basic_qos(prefetch_count=1)
+    channel_scheduled_kwds.basic_qos(prefetch_count=int(config.get('CONSUMER', 'PREFETCH')))
 
     # New kwds
     channel_new_kwds = connection.channel()
-    channel_new_kwds.queue_declare(queue='new_twitter_kwds', durable=True)
+    channel_new_kwds.queue_declare(queue=config.get('CONSUMER', 'RUN_NOW_Q'), durable=True)
     # Quality of Service
-    channel_new_kwds.basic_qos(prefetch_count=1)
+    channel_new_kwds.basic_qos(prefetch_count=int(config.get('CONSUMER', 'PREFETCH')))
 
     queued_kwds = list()
     for kwd in scheduled_kwds:
@@ -37,7 +46,7 @@ def schedule_kwds():
             'since_id': kwd['since_id']
         })
         channel_scheduled_kwds.basic_publish(exchange='',
-                                             routing_key='twitter_kwds',
+                                             routing_key=config.get('CONSUMER', 'SCHEDULED_Q'),
                                              body=kwd_data,
                                              properties=pika.BasicProperties(
                                                   delivery_mode=2,  # make message persistent
@@ -45,13 +54,12 @@ def schedule_kwds():
         queued_kwds.append(kwd['k_id'])
 
     for kwd in new_kwds:
-        print("New kwd scheduled for 24 hr calculation :", kwd["kw"])
         kwd_data = dumps({
             'kwd': kwd['kw'],
             'k_id': kwd['k_id']
         })
         channel_new_kwds.basic_publish(exchange='',
-                                       routing_key='new_twitter_kwds',
+                                       routing_key=config.get('CONSUMER', 'RUN_NOW_Q'),
                                        body=kwd_data,
                                        properties=pika.BasicProperties(
                                           delivery_mode=2,  # make message persistent
@@ -60,17 +68,20 @@ def schedule_kwds():
 
     if queued_kwds:
         n = social_keywords.update_many({"src_id": 1, "k_id": {"$in": queued_kwds}}, {"$set": {"queued": 1}})
-        print("Total queued kwds ", n.modified_count)
+        logger.info(f"Total queued kwds {n.modified_count}")
         print(" [x] Sent !")
     else:
-        print("No queued keywords")
+        logger.info("No queued keywords")
 
     channel_scheduled_kwds.close()
     channel_new_kwds.close()
     connection.close()
-    time.sleep(120)
+    time.sleep(int(config.get('SCHEDULER', 'SLEEP')))
 
 
 if __name__ == '__main__':
+    config = configparser.ConfigParser()
+    config.read(os.path.dirname(os.path.abspath(__file__)) + "/../config.ini")
+
     while True:
         schedule_kwds()
