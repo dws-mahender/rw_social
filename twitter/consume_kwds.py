@@ -102,9 +102,9 @@ if __name__ == '__main__':
     workers = int(config.get('CONSUMER', 'WORKERS'))
 
     pool = multiprocessing.Pool(processes=workers)
-    for i in range(0, workers):
-        # pool.apply_async(consume_scheduled_kwds)  # also has callback option
-        pool.apply_async(consume_new_kwds)
+    # for i in range(0, workers):
+    pool.apply_async(consume_scheduled_kwds)  # also has callback option
+    pool.apply_async(consume_new_kwds)
     # Stay alive
     try:
         while True:
