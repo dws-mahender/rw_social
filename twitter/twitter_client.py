@@ -1,7 +1,7 @@
 import configparser
 from json import load
-from tweepy import OAuthHandler, API, AppAuthHandler
-from tweepy.error import TweepError
+from tweepy import API, AppAuthHandler  # , OAuthHandler
+# from tweepy.error import TweepError
 import os
 import logging
 
