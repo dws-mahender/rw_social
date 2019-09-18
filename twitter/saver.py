@@ -1,4 +1,4 @@
-from db import connect_pg, connect_mongo, connect_es
+from db import connect_pg, connect_mongo
 import configparser
 import hashlib
 import os
