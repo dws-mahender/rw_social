@@ -7,6 +7,7 @@ twitter/__pycache__/
 
 # Dev related
 /twitter/testing/
+/twitter_kwds
 
 # logs
 /twitter/logs
