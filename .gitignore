@@ -6,8 +6,8 @@ twitter/__pycache__/
 *.ini
 
 # Dev related
-/twitter/testing/
-/twitter/twitter_kwds/
+**/testing
+**/twitter_kwds
 
 # logs
 /twitter/logs
