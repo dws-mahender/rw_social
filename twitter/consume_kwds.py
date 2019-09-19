@@ -17,6 +17,15 @@ logger = logging.getLogger('social')
 logs.configure_logging()
 
 
+def get_pika_connection():
+    credentials = pika.PlainCredentials(config.get('RABBITMQ', 'USER'), config.get('RABBITMQ', 'PWD'))
+    host = config.get('RABBITMQ', 'HOST')
+    parameters = pika.ConnectionParameters(host, credentials=credentials,
+                                           heartbeat=heartbeat, blocked_connection_timeout=timeout)
+    connection = pika.BlockingConnection(parameters)
+    return connection
+
+
 def get_tweets(ch, method, properties, body):
     kwd = loads(body)
     print(" [x] %r received %r" % (multiprocessing.current_process(), kwd,))
@@ -36,10 +45,7 @@ def get_tweets(ch, method, properties, body):
 
 def consume_scheduled_kwds():
     q = config.get('CONSUMER', 'SCHEDULED_Q')
-    credentials = pika.PlainCredentials('guest', 'guest')
-    parameters = pika.ConnectionParameters('localhost', credentials=credentials,
-                                           heartbeat=heartbeat, blocked_connection_timeout=timeout)
-    connection = pika.BlockingConnection(parameters)
+    connection = get_pika_connection()
 
     channel = connection.channel()
     channel.basic_qos(prefetch_count=int(config.get('CONSUMER', 'PREFETCH')))
@@ -59,10 +65,7 @@ def consume_scheduled_kwds():
 
 def consume_new_kwds():
     q = config.get('CONSUMER', 'RUN_NOW_Q')
-    credentials = pika.PlainCredentials('guest', 'guest')
-    parameters = pika.ConnectionParameters('localhost', credentials=credentials,
-                                           heartbeat=heartbeat, blocked_connection_timeout=timeout)
-    connection = pika.BlockingConnection(parameters)
+    connection = get_pika_connection()
 
     channel = connection.channel()
     channel.basic_qos(prefetch_count=int(config.get('CONSUMER', 'PREFETCH')))

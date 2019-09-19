@@ -10,6 +10,14 @@ from psycopg2 import extras
 from time import time
 
 
+def get_pika_connection():
+    credentials = pika.PlainCredentials(config.get('RABBITMQ', 'USER'), config.get('RABBITMQ', 'PWD'))
+    host = config.get('RABBITMQ', 'HOST')
+    parameters = pika.ConnectionParameters(host, credentials=credentials)
+    connection = pika.BlockingConnection(parameters)
+    return connection
+
+
 def bulk_insert(cursor, postgres, chunks):
     # data = list()
     # for chunk in chunks:
@@ -71,7 +79,7 @@ def save_tweets():
     delay = int(config.get('SAVER', 'DELAY'))
     normal_delay = int(config.get('SAVER', 'NORMAL_DELAY'))
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    connection = get_pika_connection()
     channel = connection.channel()
     channel.basic_qos(prefetch_count=int(config.get('SAVER', 'PREFETCH')))
     channel.queue_declare(queue=q, durable=True)

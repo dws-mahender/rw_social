@@ -101,6 +101,8 @@ def fetch_tweets(kwd, since_id, channel, redis_conf):
     t_id = 0
     _sleep = 0
     sleep_delay = int(config.get('FETCHER', 'SLEEP'))
+    retry_limit = int(config.get('FETCHER', 'RETRY_LIMIT'))
+
     while True:
         try:
             print(kwd, page_index)
@@ -129,7 +131,7 @@ def fetch_tweets(kwd, since_id, channel, redis_conf):
             # Change credential & lpush current credential id
             r.lpush(key, credential_id)
             retry += 1
-            if retry <= 2:
+            if retry <= retry_limit:
                 logger.info(f"Retrying for keyword {kwd['kwd']}")
                 _sleep += sleep_delay
                 sleep(_sleep)
@@ -148,7 +150,7 @@ def fetch_tweets(kwd, since_id, channel, redis_conf):
             retry += 1
             # Change credential & lpush current credential id
             r.lpush(key, credential_id)
-            if retry <= 2:
+            if retry <= retry_limit:
                 _sleep += sleep_delay
                 logger.info(f"Retrying for keyword {kwd['kwd']}")
                 api, credential_id = get_twitter_client(r, key)
@@ -190,6 +192,7 @@ def fetch_tweets_new(kwd, channel, redis_conf):
     t_id = 0
     _sleep = 0
     sleep_delay = int(config.get('FETCHER', 'SLEEP'))
+    retry_limit = int(config.get('FETCHER', 'RETRY_LIMIT'))
 
     while True:
         try:
@@ -220,7 +223,7 @@ def fetch_tweets_new(kwd, channel, redis_conf):
             retry += 1
             logger.error(f"Tweepy Exception occurred for credential id {credential_id} : {error}")
 
-            if retry <= 2:
+            if retry <= retry_limit:
 
                 _sleep += sleep_delay
                 logger.info(f"Retrying for keyword {kwd['kwd']}")
@@ -241,7 +244,7 @@ def fetch_tweets_new(kwd, channel, redis_conf):
             retry += 1
             # Change credential & lpush current credential id
             r.lpush(key, credential_id)
-            if retry <= 2:
+            if retry <= retry_limit:
 
                 _sleep += sleep_delay
                 logger.info(f"Retrying for keyword {kwd['kwd']}")

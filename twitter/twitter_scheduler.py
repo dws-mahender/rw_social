@@ -14,6 +14,14 @@ logger = logging.getLogger('social')
 logs.configure_logging()
 
 
+def get_pika_connection():
+    credentials = pika.PlainCredentials(config.get('RABBITMQ', 'USER'), config.get('RABBITMQ', 'PWD'))
+    host = config.get('RABBITMQ', 'HOST')
+    parameters = pika.ConnectionParameters(host, credentials=credentials)
+    connection = pika.BlockingConnection(parameters)
+    return connection
+
+
 def schedule_kwds():
     db = connect_mongo()
     social_keywords = db['request_log']
@@ -24,7 +32,7 @@ def schedule_kwds():
                                           {"scheduled_on": 1, "kw": 1, "k_id": 1, "since_id": 1, "queued": 1})
     #  "queued": {"$exists": False}} so that new kwds can not be duplicated
     new_kwds = social_keywords.find({"src_id": 1, "new": 1, "status": 1, "queued": {"$exists": False}}, {"kw": 1, "k_id": 1})
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    connection = get_pika_connection()
 
     # scheduled kwds
     channel_scheduled_kwds = connection.channel()
@@ -68,10 +76,10 @@ def schedule_kwds():
 
     if queued_kwds:
         n = social_keywords.update_many({"src_id": 1, "k_id": {"$in": queued_kwds}}, {"$set": {"queued": 1}})
-        logger.info(f"Total queued kwds {n.modified_count}")
+        print(f"Total queued kwds {n.modified_count}")
         print(" [x] Sent !")
     else:
-        logger.info("No queued keywords")
+        print("No queued keywords")
 
     channel_scheduled_kwds.close()
     channel_new_kwds.close()
